@@ -30,3 +30,19 @@
     margin-top: 10px;
     display: none;
 }
+
+#grafico3{
+    height: 600px;
+    overflow-y: auto;
+}
+
+#tipos{
+    width: 300px;
+    padding: 5px;
+    font-size: 1em;
+}
+
+.dropdown-menu p-2{
+    max-height: 300px;
+    overflow-y: auto;
+}
