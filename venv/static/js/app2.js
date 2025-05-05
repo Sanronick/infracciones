@@ -84,7 +84,7 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
   
   // Función para actualizar el mapa
   function actualizarMapa() {
-    document.getElementById("spinner-overlay").style.display = "block";
+    document.getElementById("spinner-overlay").style.display = "flex";
   
     const fecha1 = document.getElementById("fecha1").value || "2025-01-01";
     const fecha2 = document.getElementById("fecha2").value || "2025-12-31";
@@ -110,10 +110,22 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
         if (data && data.tipos) {
           crearCheckboxes(data.tipos, tipos);
         }
+        if(data && data.tabla_comunas){
+          const tbody=document.querySelector("#tablaComunas tbody");
+          tbody.innerHTML = "";
+          data.tabla_comunas.forEach(fila => {
+            const tr =document.createElement("tr");
+            tr.innerHTML = `<td>${fila.comuna}</td><td>${fila.cantidad}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
         document.getElementById("spinner-overlay").style.display = "none";
       })
       .catch(error => {
         document.getElementById("spinner-overlay").style.display = "none";
+        const mensajeError= document.getElementById("mensaje-error");
+        mensajeError.style.display="block"
+        mensajeError.textContent="Error al cargar los datos: "+ error.message;
         console.error("Error al actualizar el mapa: ", error);
       });
   }
@@ -121,8 +133,12 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
   // Al cargar la página:
   document.addEventListener("DOMContentLoaded", function () {
     // Establecemos valores por defecto para las fechas
-    document.getElementById("fecha1").value = "2021-01-01";
-    document.getElementById("fecha2").value = "2025-12-31";
+    const hoy= new Date();
+    const inicioAño=`${hoy.getFullYear()}-01-01`;
+    const finAño=`${hoy.getFullYear()}-12-31`;
+
+    document.getElementById("fecha1").value = inicioAño;
+    document.getElementById("fecha2").value = finAño;
 
     if(typeof MAPA_DATA!=='undefined'){
       const mapaParsed=typeof MAPA_DATA === 'string' ? JSON.parse(MAPA_DATA) : MAPA_DATA;
@@ -138,181 +154,18 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
     // Manejar el envío del formulario de filtros
     document.getElementById("formGeo").addEventListener("submit", function (e) {
       e.preventDefault();
+      const fecha1=document.getElementById("fecha1").value;
+      const fecha2=document.getElementById("fecha2").value;
+
+      if (new Date(fecha1) > new Date(fecha2)) {
+        alert("La fecha inicial no puede ser posterior a la fecha final.");
+        return;
+      }
+
       actualizarMapa();
     });
-
-
-    // // Mostrar el spinner y actualizar el mapa
-    // document.getElementById("spinner-overlay").style.display = "block";
-    // actualizarMapa();
-  
   });
   
   // Actualización automática cada 5 minutos (300000 ms)
   setInterval(actualizarMapa, 300000);
   
-
-
-
-
-
-// function crearCheckboxes(tipos, filtrosPrevios=null) {
-//   const contenedor = document.getElementById("dropdownTiposContainer");
-//   const dropdownBtn = document.getElementById("dropdownTipos");
-//   contenedor.innerHTML = "";
-
-//   //Opcion TODAS
-//   const todas=document.createElement('li');
-//   contenedor.innerHTML += `
-    
-//     <div class="form-check">
-//         <input type="checkbox" id="checkTodas" class="form-check-input" value="TODAS" checked>
-//         <label for="checkTodas" class="form-check-label">TODAS</label>
-//     </div>
-
-// `;
-// contenedor.appendChild(todas);
-
-// const hr=document.createElement("hr");
-// hr.classList.add("dropdown","divider");
-// contenedor.appendChild(hr)
-
-
-
-
-
-//   //Agrego el resto de tipos de infracciones
-//   tipos.forEach((tipo, index) => {
-//     const li=document.createElement("li");
-//     const isSelected= filtrosPrevios && filtrosPrevios.includes(tipo);
-//     li.innerHTML += `
-//     <li>
-//     <div class="form-check">
-//         <input type="checkbox" id="checkTipo${index}" class="form-check-input checkTipo" value="${tipo}">
-//         <label for="checkTipo${index}" class="form-check-label">${tipo}</label>
-//     </div>
-// </li>`;
-// contenedor.appendChild(li);
-//   });
-
-
-//   //Si se marca TODAS se desmarcan las demás
-//   document.getElementById('checkTodas')?.addEventListener('change',function(){
-//     if(this.checked){
-//         document.querySelectorAll('.checkTipo').forEach(c=> c.checked= false);
-//     }
-//     actualizarTextoDropdown();
-//   });
-
-
-//   //Si se marca alguna opcion se desmarca TODAS
-//   document.querySelectorAll('.checkTipo').forEach(check=>{
-//     check.addEventListener('change',()=>{
-//         if (this){}
-//         document.getElementById('checkTodas').checked=false;
-//         actualizarTextoDropdown();
-//     });
-//   });
-
-//   function actualizarTextoDropdown(){
-//     const checkTodas=document.getElementById('checkTodas');
-//     const seleccionadas=[...document.querySelectorAll('.checkTipo:checked')].map(c => c.value);
-
-//     if (checkTodas.checked || seleccionadas.length===0){
-//         dropdownBtn.textContent='Todas las infracciones';
-//     } else if(seleccionadas.length===1){
-//         dropdownBtn.textContent=seleccionadas[0];
-//     } else{
-//         dropdownBtn.textContent=`${seleccionadas.length} seleccionadas`;
-//     }
-//   }
-// }
-
-
-
-
-// function getTiposSeleccionados(){
-//     const checkTodas=document.getElementById('checkTodas');
-//     if (checkTodas.checked) return null; //null implica Todas
-
-//     const seleccionados=[];
-//     document.querySelectorAll('.checkTipo:checked').forEach(check=>{
-//         seleccionados.push(check.value);
-//     });
-//     return seleccionados;
-// }
-
-// function actualizarMapa() {
-//     document.getElementById('spinner-overlay').style.display='block';
-//     const fecha1=document.getElementById('fecha1').value;
-//     const fecha2=document.getElementById('fecha2').value;
-//     const tipos=getTiposSeleccionados();
-
-//     // const selectTipos=document.getElementById('tipos');
-//     // const tiposSeleccionados=Array.from(document.getElementById('tipos').selectedOptions).map(opt=>opt.value);
-
-//     fetch('/geo_data',{
-//         method:'POST',
-//         headers:{'Content-Type':'application/json'},
-//         body:JSON.stringify({
-//             fecha1,
-//             fecha2,
-//             tipos:tipos
-//         })
-//     })
-//     .then(response=>response.json())
-//     .then(data=>{
-//         document.getElementById('spinner-overlay').style.display='none';
-
-//         if(data && data.mapa){
-//             const mapa=JSON.parse(data.mapa);
-//             Plotly.newPlot('mapa',mapa.data,mapa.layout,{responsive:true});
-            
-
-//         }
-
-//         //Actualizo el dropdown con la lista completa de tipos
-//         if(data && data.tipos){
-//             crearCheckboxes(data.tipos,tipos);
-//         }
-
-        
-//     })
-//     .catch(error=>{
-//         document.getElementById('spinner-overlay').style.display='none';
-//         console.error('Error al actualizar el mapa: ',error)
-//     });
-
-// }
-
-// //Cargo el mapa al inicio con los datos de fecha precargados
-// document.addEventListener('DOMContentLoaded',function(){
-
-//     document.getElementById('spinner-overlay').style.display='block';
-
-//     //Valores por defecto
-//     document.getElementById('fecha1').value='2021-01-01';
-//     document.getElementById('fecha2').value='2025-12-31';
-
-
-
-//     //Actualizo el mapa al cargar.
-
-//     actualizarMapa();
-
-//     //Manejo del submit del formulario de filtros.
-//     document.getElementById('formGeo').addEventListener('submit',function(e){
-//         e.preventDefault();
-//         actualizarMapa();
-//     });
-
-// });
-
-// //Actualizo los datos
-// // document.getElementById('formGeo').addEventListener('submit',function(event){
-// //     event.preventDefault();
-// //     actualizarMapa();
-// // })
-
-// //Actualizacion cada 5 minutos
-// setInterval(actualizarMapa, 300000);

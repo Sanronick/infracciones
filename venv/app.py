@@ -1,21 +1,44 @@
 from conexion import ConectorDB
-from flask import Flask,render_template,jsonify,request
+from flask import Flask,render_template,jsonify,request,redirect,session
 import pandas as pd
 from plotly import express as px
 import json
 import textwrap
 import requests
+import geopandas as gpd
+import os
+from urllib.parse import urlencode
+from dotenv import load_dotenv
+import ssl
+
+load_dotenv()
+
 
 
 def ajuste(text,width=40):
     return '<br>'.join(textwrap.wrap(text,width))
 
+def puntos(numero):
+    return "{:,}".format(numero).replace(",",".")
+
 
 app=Flask(__name__)
+app.secret_key=os.urandom(24)
+
+TENANT_ID=os.getenv("TENANT_ID")
+CLIENT_ID=os.getenv("CLIENT_ID")
+CLIENT_SECRET=os.getenv("CLIENT_SECRET")
+REDIRECT_URI=os.getenv("REDIRECT_URI")
+
+
+AUTHORITY=f'https://login.microsoftonline.com/{TENANT_ID}'
+AUTH_URL=f'{AUTHORITY}/oauth2/v2.0/authorize'
+TOKEN_URL=f'{AUTHORITY}/oauth2/v2.0/token'
+SCOPE='openid profile email'
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html',user=session.get("user"))
 
 @app.route('/infracciones',methods=['GET','POST'])
 def infracciones():
@@ -45,16 +68,32 @@ def infracciones():
 
             infracciones_año=infracciones_año.sort_values(by='AÑO')
             infracciones_año['AÑO']=infracciones_año['AÑO'].astype(str)
+
+            valores_con_formato=[puntos(valor) for valor in infracciones_año['CANTIDAD']]
+
+
             graf1=px.bar(
                 data_frame=infracciones_año,
                 x='AÑO',
                 y='CANTIDAD',
-                title='INFRACCIONES POR AÑO'
+                title='INFRACCIONES POR AÑO',
+                text_auto=True,
+                text=valores_con_formato
             )
 
             graf1.update_layout(
                 xaxis_title='AÑO',
-                yaxis_title='CANTIDAD DE INFRACCIONES'
+                yaxis_title='CANTIDAD DE INFRACCIONES',
+                yaxis=dict(
+                    tickformat=',.0f',
+                ),
+                uniformtext_minsize=8,
+                uniformtext_mode='hide'
+            )
+
+            graf1.update_traces(
+                texttemplate='%{text}',
+                textposition='outside'
             )
             graf1_json=graf1.to_json()
 
@@ -203,7 +242,7 @@ def infracciones():
 
             graf3.update_layout(
                 showlegend=False,
-                height=100*len(df_tipoinfraccion),
+                height=max(100,100*len(df_tipoinfraccion)),
                 margin=dict(l=300,r=50,t=80,b=50),
                 yaxis=dict(automargin=False),
                 title=dict(
@@ -232,101 +271,6 @@ def infracciones():
         return render_template('infracciones.html',grafico1=graf1_json)
     
 
-
-# @app.route('/geo_data',methods=['POST'])
-# def geo_data():
-
-#     data_request=request.get_json()
-#     fecha1=data_request.get('fecha1')
-#     fecha2=data_request.get('fecha2')
-#     tipos_filtro=data_request.get('tipos')
-
-#     with ConectorDB() as cursor:
-
-#         sql='''
-#             SELECT
-#                 ai.SLAT,
-#                 ai.SLNG,
-#                 ti.DES
-#             FROM
-#                 AGENTES.ACTA_INFRACCION ai
-#             INNER JOIN AGENTES.ACTA_INFRACCION_INFRACCION aii ON
-#                 ai.id = aii.ID
-#             INNER JOIN AGENTES.TIPO_INFRACCIONES ti ON
-#                 aii.TIPO_INFRACCIONES_FK = ti.ID
-#             WHERE to_date(ai.fech) between to_date(:fecha1,'YYYY-MM-DD') and to_date(:fecha2,'YYYY-MM-DD')
-#             and ai.dependencia_fk in ( 58,
-#                                         59,
-#                                         61 )
-#             and ai.slat is not null
-#             and ai.slng is not null
-#             and ai.SLAT <>'0'
-#             and ai.SLNG <>'0'
-#             '''
-    
-    
-#         if tipos_filtro:
-#             tipos_named={f'tipo{i}':tipo for i, tipo in enumerate(tipos_filtro)}
-#             sql+=f" AND ti.DES IN ({','.join(f':{k}' for k in tipos_named)})"
-#             params={'fecha1':fecha1,'fecha2':fecha2,**tipos_named}
-        
-#         else:
-#             params={'fecha1':fecha1,'fecha2':fecha2}
-
-#         cursor.execute(sql,params)
-
-#         geo=cursor.fetchall()
-
-#         df_geo=pd.DataFrame(geo,columns=['lat','lon','tipo_infraccion'])
-#         tipos_infraccion=sorted(df_geo['tipo_infraccion'].unique().tolist())
-
-
-
-#         #Cargo el GeoJson
-#         geojson="https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
-#         datos_geo=requests.get(geojson).json()
-
-#         #Creo el mapa
-
-#         mapa=px.scatter_mapbox(
-#             df_geo,
-#             lat='lat',
-#             lon='lon',
-#             color='tipo_infraccion',
-#             zoom=1,
-#             height=600,
-#             title="Infracciones por Comunas"
-#         )
-
-#         #Agrego la capa por comunas
-#         mapa.update_layout(
-#             mapbox=dict(
-#                 style="open-street-map",
-#                 layers=[
-#                     dict(
-#                         sourcetype="geojson",
-#                         source=datos_geo,
-#                         type="line",
-#                         color="black",
-#                         line=dict(width=2)
-#                     )
-#                 ],
-#                 center={"lat":-34.60,"lon":-58.38},
-#                 zoom=11
-#             ),
-#             margin={"r":0,"t":40,"l":0,"b":0},
-#             title=dict(x=0.5),
-#             showlegend=False
-#         )
-
-#         return jsonify({'mapa':mapa.to_json(),'tipos':tipos_infraccion})
-
-# @app.route('/geo',methods=['GET'])
-# def geo():
-#     return render_template('Geolocalizacion.html')
-
-
-
 @app.route('/geo',methods=['GET','POST'])
 def geo():
     if request.method=='GET':
@@ -343,80 +287,88 @@ def geo():
 
     with ConectorDB() as cursor:
 
-        sql='''
-            SELECT
-                ai.SLAT,
-                ai.SLNG,
-                ti.DES
-            FROM
-                AGENTES.ACTA_INFRACCION ai
-            INNER JOIN AGENTES.ACTA_INFRACCION_INFRACCION aii ON
-                ai.id = aii.ID
-            INNER JOIN AGENTES.TIPO_INFRACCIONES ti ON
-                aii.TIPO_INFRACCIONES_FK = ti.ID
-            WHERE to_date(ai.fech) between to_date(:fecha1,'YYYY-MM-DD') and to_date(:fecha2,'YYYY-MM-DD')
-            and ai.dependencia_fk in ( 58,
-                                        59,
-                                        61 )
-            and ai.slat is not null
-            and ai.slng is not null
-            and ai.SLAT <>'0'
-            and ai.SLNG <>'0'
-            '''
-        
-        if tipos_filtro:
-            tipos_named={f'tipo{i}':tipo for i, tipo in enumerate(tipos_filtro)}
-            sql+=f" AND ti.DES IN ({','.join(f':{k}' for k in tipos_named)})"
-            params={'fecha1':fecha1,'fecha2':fecha2,**tipos_named}
-        
-        else:
-            params={'fecha1':fecha1,'fecha2':fecha2}
+        try:
 
-        cursor.execute(sql,params)
-        # cursor.execute(
-        #     '''
-        #     SELECT
-        #         ai.SLAT,
-        #         ai.SLNG,
-        #         ti.DES
-        #     FROM
-        #         AGENTES.ACTA_INFRACCION ai
-        #     INNER JOIN AGENTES.ACTA_INFRACCION_INFRACCION aii ON
-        #         ai.id = aii.ID
-        #     INNER JOIN AGENTES.TIPO_INFRACCIONES ti ON
-        #         aii.TIPO_INFRACCIONES_FK = ti.ID
-        #     WHERE to_date(ai.fech) between to_date(:fecha1,'YYYY-MM-DD') and to_date(:fecha2,'YYYY-MM-DD')
-        #     and ai.dependencia_fk in ( 58,
-        #                                 59,
-        #                                 61 )
-        #     and ai.slat is not null
-        #     and ai.slng is not null
-        #     and ai.SLAT <>'0'
-        #     and ai.SLNG <>'0'
-        #     ''',fecha1=fecha1,fecha2=fecha2
-        # )
+            sql='''
+                SELECT
+                    ai.SLAT,
+                    ai.SLNG,
+                    ti.DES
+                FROM
+                    AGENTES.ACTA_INFRACCION ai
+                INNER JOIN AGENTES.ACTA_INFRACCION_INFRACCION aii ON
+                    ai.id = aii.ID
+                INNER JOIN AGENTES.TIPO_INFRACCIONES ti ON
+                    aii.TIPO_INFRACCIONES_FK = ti.ID
+                WHERE to_date(ai.fech) between to_date(:fecha1,'YYYY-MM-DD') and to_date(:fecha2,'YYYY-MM-DD')
+                and ai.dependencia_fk in ( 58,
+                                            59,
+                                            61 )
+                and ai.slat is not null
+                and ai.slng is not null
+                and ai.SLAT <>'0'
+                and ai.SLNG <>'0'
+                '''
+            
+            if tipos_filtro:
+                tipos_named={f'tipo{i}':tipo for i, tipo in enumerate(tipos_filtro)}
+                sql+=f" AND ti.DES IN ({','.join(f':{k}' for k in tipos_named)})"
+                params={'fecha1':fecha1,'fecha2':fecha2,**tipos_named}
+            
+            else:
+                params={'fecha1':fecha1,'fecha2':fecha2}
 
-        geo=cursor.fetchall()
+            cursor.execute(sql,params)
+        
+
+            geo=cursor.fetchall()
+
+        except Exception as e:
+            return jsonify({'Error al obtener los datos': str(e)}),500
 
         df_geo=pd.DataFrame(geo,columns=['lat','lon','tipo_infraccion'])
         tipos_infraccion=sorted(df_geo['tipo_infraccion'].unique().tolist())
 
-        # df_geo_all=pd.DataFrame(geo,columns=['lat','lon','tipo_infraccion'])
-
-        # #Lista de Tipos de infraccion
-        # full_tipos=sorted(df_geo_all['tipo_infraccion'].unique().tolist())
-
-        # #Si el usuario aplico el filtro, se filtra el dataframe
-        # if tipos_filtro:
-        #     df_geo=df_geo_all[df_geo_all['tipo_infraccion'].isin(tipos_filtro)]
-        # else:
-        #     df_geo=df_geo_all.copy()
 
 
 
         #Cargo el GeoJson
         geojson="https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
         datos_geo=requests.get(geojson).json()
+
+        #GeoDataFrame con datos de las infracciones
+        gdf_infracciones=gpd.GeoDataFrame(
+            df_geo,
+            geometry=gpd.points_from_xy(df_geo['lon'],df_geo['lat']),crs="EPSG:4326"
+        )
+
+        #GeoDataFrame con los datos de las comunas
+        gdf_comunas=gpd.read_file(geojson)
+        gdf_comunas=gdf_comunas.to_crs(gdf_infracciones.crs)
+
+        #Union de infraccion por comunas
+        infracciones_comunas=gpd.sjoin(
+            gdf_infracciones,
+            gdf_comunas[['comuna','geometry']],
+            how='inner',
+            predicate='within'
+        )
+
+        #Calculo infracciones por comunas
+        cant_infracciones_comunas=infracciones_comunas['comuna'].value_counts().to_dict()
+
+        #Inserto la cantidad de infracciones por comuna en los datos del GeoJson de las comunas
+
+        for feature in datos_geo['features']:
+            comuna_nombre=feature['properties']['comuna']
+            cantidad=cant_infracciones_comunas.get(comuna_nombre,0)
+            feature['properties']['cantidad_infracciones']=cantidad
+
+
+
+
+
+
 
         #Creo el mapa
 
@@ -426,7 +378,7 @@ def geo():
             lon='lon',
             color='tipo_infraccion',
             zoom=1,
-            height=600,
+            height=900,
             title="Infracciones por Comunas"
         )
 
@@ -453,12 +405,113 @@ def geo():
 
         map_json=mapa.to_json()
 
+        tabla_comunas=[{'comuna':k,'cantidad':v} for k,v in cant_infracciones_comunas.items()]
+
+        tabla_comunas.sort(key=lambda x: int(x['comuna']) if str(x['comuna']).isdigit() else str(x['comuna']))
+
+
+
         if request.method=='POST':
-            return jsonify({'mapa':map_json})
-            #return jsonify({'mapa':map_json,'tipos':full_tipos})
+            return jsonify({'mapa':map_json,
+                            'tipos':tipos_infraccion,
+                            'tabla_comunas':tabla_comunas})
+            
         else:
-            return render_template('Geolocalizacion.html',mapa=map_json,tipos=tipos_infraccion)
-            #return render_template('Geolocalizacion.html',mapa=map_json,tipos=full_tipos)
+            return render_template('Geolocalizacion.html',mapa=map_json,tipos=tipos_infraccion,tabla_comunas=tabla_comunas)
+        
+
+
+
+@app.route("/login")
+def login():
+    params={
+        "client_id":CLIENT_ID,
+        "response_type":"code",
+        "redirect_uri":REDIRECT_URI,
+        "response_mode":"query",
+        "scope":SCOPE,
+        "state":os.urandom(8).hex()
+    }
+
+    login_url=f'{AUTH_URL}?{urlencode(params)}'
+    return redirect(login_url)
+
+
+@app.route("/getAToken")
+def getAToken():
+    code=request.args.get("code")
+
+    if not code:
+        return "Error: no se recibió el codigo de autorizacion",400
+    
+    token_data={
+        "client_id":CLIENT_ID,
+        "scope":SCOPE,
+        "code":code,
+        "redirect_uri":REDIRECT_URI,
+        "grant_type":"authorization_code",
+        "client_secret":CLIENT_SECRET
+    }
+
+    response=requests.post(TOKEN_URL,data=token_data)
+    if response.status_code != 200:
+        return f'Error al obtener el token: {response.text}',400
+    
+    tokens=response.json()
+    access_token=tokens["access_token"]
+    session["refresh_token"]=tokens.get("refresh_token")
+
+
+    #datos del usuario
+    user_info=requests.get(
+        "https://graph.microsoft.com/v1.0/me",
+        headers={"Authorization": f"Bearer {access_token}"}
+    ).json()
+
+    session["user"]=user_info
+    return redirect("/")
+
+
+# @app.route("/home")
+# def home():
+#     if 'user' not in session:
+#         return redirect("/")
+    
+#     return render_template("home.html",user=session["user"])
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
+
+@app.route("/refresh",methods=["POST"])
+def refresh():
+    refresh_token=session.get("refresh_token")
+
+    if not refresh_token:
+        return redirect("/login")
+    
+    data={
+        "client_id":CLIENT_ID,
+        "scope":SCOPE,
+        "refresh_token":refresh_token,
+        "grant_type":"refresh_token",
+        "client_secret":CLIENT_SECRET
+    }
+
+    resp=requests.post(TOKEN_URL,data=data)
+
+    if resp.status_code != 200:
+        session.clear()
+        return redirect("/login")
+    
+    tokens=resp.json()
+    session["access_token"]=tokens["access_token"]
+    session["refresh_token"]=tokens.get("refresh_token",refresh_token)
+    return jsonify(tokens)
+            
 
 
 
@@ -466,7 +519,19 @@ def geo():
 
 
 if __name__=='__main__':
-    app.run(debug=True)
+    context=ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    basedir=os.path.abspath(os.path.dirname(__file__))
+    cert_file=os.path.join(basedir,'cert.pem')
+    key_file=os.path.join(basedir,'key.pem')
+
+    context.load_cert_chain(certfile=cert_file,keyfile=key_file)
+   
+    app.run(
+        host='127.0.0.1',
+        port=5000,
+        debug=True,
+        ssl_context=context
+    )
 
 
             

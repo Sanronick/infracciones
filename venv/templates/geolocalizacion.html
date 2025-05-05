@@ -32,9 +32,9 @@
 
     <form id="formGeo">
       <label for="fecha1">Seleccione una Fecha: </label>
-      <input type="date" name="fecha1" id="fecha1" />
+      <input type="date" name="fecha1" id="fecha1" / required>
       <label for="fecha2">Hasta: </label>
-      <input type="date" name="fecha2" id="fecha2" />
+      <input type="date" name="fecha2" id="fecha2" / required>
       <div class="dropdown mt-2">
         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownTipos" data-bs-toggle="dropdown" aria-expanded="false">
             Seleccionar Tipo de Infraccion
@@ -46,10 +46,31 @@
       <button type="submit">Filtrar</button>
     </form>
 
-    <div id="spinner-overlay" style="display: block">
+    <div id="spinner-overlay" style="display: none;">
       <div class="loader"></div>
     </div>
+    <div id="mensaje-error" style="display: none;"></div>
+    <h2>Cantidad de Infracciones</h2>
+    <table class="table table-striped mt-2" id="tablaComunas">
+      <thead>
+        <tr>
+          <th>Comuna</th>
+          <th>Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila in tabla_comunas %}
+        <tr>
+          <td>{{fila.comuna}}</td>
+          <td>{{fila.cantidad}}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     <div id="mapa"></div>
+
+
+
     <script>
       const TIPOS_INFRACCION={{ tipos|tojson }};
       const MAPA_DATA={{ mapa | safe}}
