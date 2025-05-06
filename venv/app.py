@@ -1,5 +1,5 @@
 from conexion import ConectorDB
-from flask import Flask,render_template,jsonify,request,redirect,session
+from flask import Flask,render_template,jsonify,request,redirect,session,url_for
 import pandas as pd
 from plotly import express as px
 import json
@@ -10,6 +10,7 @@ import os
 from urllib.parse import urlencode
 from dotenv import load_dotenv
 import ssl
+from datetime import timedelta, datetime, timezone
 
 load_dotenv()
 
@@ -29,6 +30,13 @@ TENANT_ID=os.getenv("TENANT_ID")
 CLIENT_ID=os.getenv("CLIENT_ID")
 CLIENT_SECRET=os.getenv("CLIENT_SECRET")
 REDIRECT_URI=os.getenv("REDIRECT_URI")
+SECRET_KEY=os.getenv("SECRET_KEY")
+app.config['PERMANENT_SESSION_LIFETIME']=timedelta(
+    minutes=int(os.getenv("PERMANENT_SESSION_LIFETIME",30))
+)
+app.config["SESSION_COOKIE_SECURE"]=True
+app.config["SESSION_COOKIE_HTTPONLY"]=True
+app.config["SESSION_COOKIE_SAMESITE"]="Lax"
 
 
 AUTHORITY=f'https://login.microsoftonline.com/{TENANT_ID}'
@@ -78,7 +86,8 @@ def infracciones():
                 y='CANTIDAD',
                 title='INFRACCIONES POR AÑO',
                 text_auto=True,
-                text=valores_con_formato
+                text=valores_con_formato,
+                height=1000
             )
 
             graf1.update_layout(
@@ -424,6 +433,7 @@ def geo():
 
 @app.route("/login")
 def login():
+    
     params={
         "client_id":CLIENT_ID,
         "response_type":"code",
@@ -444,6 +454,13 @@ def getAToken():
     if not code:
         return "Error: no se recibió el codigo de autorizacion",400
     
+    if session.get("auth_code")==code:
+        return redirect(url_for("index"))
+    
+    session["auth_code"] = code
+
+
+    
     token_data={
         "client_id":CLIENT_ID,
         "scope":SCOPE,
@@ -455,21 +472,28 @@ def getAToken():
 
     response=requests.post(TOKEN_URL,data=token_data)
     if response.status_code != 200:
+        session.pop("auth_code",None)
         return f'Error al obtener el token: {response.text}',400
     
     tokens=response.json()
-    access_token=tokens["access_token"]
-    session["refresh_token"]=tokens.get("refresh_token")
+    session.permanent=True
+    session['_fresh']=datetime.now(timezone.utc) + timedelta(minutes=30)
+    session['access_token']=tokens["access_token"]
+    session['refresh_token']=tokens.get("refresh_token")
+
+
+    # access_token=tokens["access_token"]
+    # session["refresh_token"]=tokens.get("refresh_token")
 
 
     #datos del usuario
     user_info=requests.get(
         "https://graph.microsoft.com/v1.0/me",
-        headers={"Authorization": f"Bearer {access_token}"}
+        headers={"Authorization": f"Bearer {tokens['access_token']}"}
     ).json()
 
     session["user"]=user_info
-    return redirect("/")
+    return redirect(url_for("index"))
 
 
 # @app.route("/home")
@@ -483,23 +507,44 @@ def getAToken():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/")
+
+    logout_url=(
+        f'https://login.microsoftonline.com/{TENANT_ID}'
+        '/oauth2/v2.0/logout'
+        f'?post_logout_redirect_uri={url_for('index',_external=True)}'
+    )
+    return redirect(logout_url)
 
 
 @app.route("/refresh",methods=["POST"])
 def refresh():
-    refresh_token=session.get("refresh_token")
-
-    if not refresh_token:
+    if 'refresh_token' not in session:
         return redirect("/login")
     
-    data={
+    #verifico el tiempo minimo entre refrescos(5 minutos)
+    last_refresh=session.get('last_refresh')
+    if last_refresh and (datetime.now() - last_refresh) < timedelta(minutes=5):
+
+        data={
         "client_id":CLIENT_ID,
         "scope":SCOPE,
-        "refresh_token":refresh_token,
+        "refresh_token":session['refresh_token'],
         "grant_type":"refresh_token",
         "client_secret":CLIENT_SECRET
     }
+        
+    # refresh_token=session.get("refresh_token")
+
+    # if not refresh_token:
+    #     return redirect("/login")
+    
+    # data={
+    #     "client_id":CLIENT_ID,
+    #     "scope":SCOPE,
+    #     "refresh_token":refresh_token,
+    #     "grant_type":"refresh_token",
+    #     "client_secret":CLIENT_SECRET
+    # }
 
     resp=requests.post(TOKEN_URL,data=data)
 
@@ -509,8 +554,28 @@ def refresh():
     
     tokens=resp.json()
     session["access_token"]=tokens["access_token"]
-    session["refresh_token"]=tokens.get("refresh_token",refresh_token)
-    return jsonify(tokens)
+    session["refresh_token"]=tokens.get("refresh_token",session['refresh_token'])
+    session['last_refresh']=datetime.now()
+    session['_fresh']=datetime.now() + timedelta(minutes=30)
+
+
+    #return jsonify(tokens)
+    return jsonify({"status":"token refreshed"})
+
+
+#Verifico session
+@app.before_request
+def check_session():
+    if request.endpoint in ['index','login','getAToken','static']:
+        return
+    
+    if 'user' not in session:
+        return redirect('/login')
+    
+    if '_fresh' in session:
+        if datetime.now(timezone.utc) > session['_fresh']:
+            session.clear()
+            return redirect('/login')
             
 
 
