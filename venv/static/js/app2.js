@@ -1,73 +1,94 @@
 // Función para crear el dropdown con checkboxes de tipos de infracción
-function crearCheckboxes(tipos, filtrosPrevios = null) {
-    const contenedor = document.getElementById("dropdownTiposContainer");
-    const dropdownBtn = document.getElementById("dropdownTipos");
-    contenedor.innerHTML = "";
-  
-    // Crear checkbox "TODAS"
-    const liTodas = document.createElement("li");
-    liTodas.innerHTML = `
-      <div class="form-check">
-        <input type="checkbox" id="checkTodas" class="form-check-input" value="TODAS" checked>
-        <label for="checkTodas" class="form-check-label">TODAS</label>
-      </div>`;
+function crearCheckboxes(tipos,filtrosPrevios=null){
+  const contenedor=document.getElementById("dropdownTiposContainer");
+  const dropdownBtn=document.getElementById("dropdownTipos");
+  contenedor.innerHTML="";
+
+  //Busqueda por tipo de infraccion
+  const liSearch=document.createElement("li");
+  liSearch.innerHTML=`
+  <input type="text" id="inputBusquedaTipos" class="form-control mb-2" placeholder="Buscar Infraccion...">`;
+  contenedor.appendChild(liSearch);
+
+  //Todas
+  const liTodas=document.createElement("li");
+  const todasSeleccionadas=!filtrosPrevios || filtrosPrevios.length===0;
+  liTodas.innerHTML=`
+  <div class="form-check">
+    <input type="checkbox" id="checkTodas" class="form-check-input" value="TODAS" ${todasSeleccionadas ? "checked" : ""}>
+    <label for="checkTodas" class="form-check-label">TODAS</label>
+    </div>`;
     contenedor.appendChild(liTodas);
-  
-    // Agregar divisor
-    const hr = document.createElement("hr");
-    hr.classList.add("dropdown", "divider");
+
+    //Agregar divisor
+    const hr=document.createElement("hr");
+    hr.classList.add("dropdown","divider");
     contenedor.appendChild(hr);
-  
-    // Agregar cada tipo de infracción como checkbox
-    tipos.forEach((tipo, index) => {
-      const li = document.createElement("li");
-      const isSelected = filtrosPrevios && filtrosPrevios.includes(tipo);
-      li.innerHTML = `
-        <div class="form-check">
-          <input type="checkbox" id="checkTipo${index}" class="form-check-input checkTipo" value="${tipo}" ${isSelected ? "checked" : ""}>
-          <label for="checkTipo${index}" class="form-check-label">${tipo}</label>
+
+    //Checkboxes de Tipos de Infraccion
+    tipos.forEach((tipo,index)=>{
+
+      const isSelected=filtrosPrevios && filtrosPrevios.includes(tipo);
+      const li=document.createElement("li");
+      li.innerHTML=`
+      <div class="form-check">
+        <input type="checkbox" id="checkTipo${index}" class="form-check-input checkTipo" value="${tipo}" ${isSelected ? "checked":""}>
+        <label for="checkTipo${index}" class="form-check-label">${tipo}</label>
         </div>`;
-      contenedor.appendChild(li);
+        contenedor.appendChild(li);;
     });
-  
-    // Asignar evento al checkbox "TODAS"
-    const checkTodas = document.getElementById("checkTodas");
-    if (checkTodas) {
-      checkTodas.addEventListener("change", function () {
-        if (this.checked) {
-          document.querySelectorAll(".checkTipo").forEach(c => (c.checked = false));
-        }
+
+    //Boton Listo
+    const liBoton=document.createElement("li");
+    liBoton.classList.add("text-center","mt-2");
+    liBoton.innerHTML=`<button class="btn btn-sm btn-primary" id="btnCerrarDropdown">LISTO</button>`;
+    contenedor.appendChild(liBoton);
+
+
+    //Filtro de busqueda
+    document.getElementById("inputBusquedaTipos").addEventListener("input",function(){
+      const filtro=this.value.toLowerCase();
+      document.querySelectorAll("#dropdownTiposContainer .checkTipo").forEach(check =>{
+
+        const label=check.nextElementSibling.textContent.toLowerCase();
+        const visible=label.includes(filtro);
+        check.closest("li").style.display=visible ? "":"none";
+      });
+
+
+    });
+
+
+    //Evento Todas
+    const checkTodas=document.getElementById("checkTodas");
+    if (checkTodas){
+      checkTodas.addEventListener("change",function(){
+        document.querySelectorAll(".checkTipo").forEach(c =>c.checked=false);
         actualizarTextoDropdown();
       });
     }
-  
-    // Asignar evento a cada checkbox individual
+
+
+    //Checkboxes Individuales
     document.querySelectorAll(".checkTipo").forEach(check => {
-      check.addEventListener("change", function () {
-        const todas = document.getElementById("checkTodas");
-        if (todas) {
-          todas.checked = false;
-        }
+      check.addEventListener("change",function(){
+
+        const todas=document.getElementById("checkTodas");
+        if (todas) todas.checked=false;
         actualizarTextoDropdown();
       });
     });
-  
-    // Función para actualizar el texto del botón del dropdown
-    function actualizarTextoDropdown() {
-      const checkTodas = document.getElementById("checkTodas");
-      const seleccionadas = [...document.querySelectorAll(".checkTipo:checked")].map(c => c.value);
-  
-      if (checkTodas && checkTodas.checked || seleccionadas.length === 0) {
-        dropdownBtn.textContent = "Todas las infracciones";
-      } else if (seleccionadas.length === 1) {
-        dropdownBtn.textContent = seleccionadas[0];
-      } else {
-        dropdownBtn.textContent = `${seleccionadas.length} seleccionadas`;
-      }
-    }
-  
-    actualizarTextoDropdown();
-  }
+
+
+    //Evento del boton LISTO
+
+    document.getElementById("btnCerrarDropdown").addEventListener("click",()=>{
+      document.getElementById("dropdownMenuTipos").classList.remove("show");
+      document.getElementById("dropdownTiposContainer").parentElement.classList.remove("show");
+    });
+
+}
+
   
   // Función para obtener los tipos seleccionados; si "TODAS" está marcada, devuelve null
   function getTiposSeleccionados() {
@@ -84,6 +105,8 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
   
   // Función para actualizar el mapa
   function actualizarMapa() {
+    const mensajeError=document.getElementById("mensaje-error");
+    mensajeError.style.display="none";
     document.getElementById("spinner-overlay").style.display = "flex";
   
     const fecha1 = document.getElementById("fecha1").value || "2025-01-01";
@@ -109,6 +132,8 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
         // Actualizamos el dropdown con la lista completa de tipos, manteniendo la selección actual
         if (data && data.tipos) {
           crearCheckboxes(data.tipos, tipos);
+
+          actualizarTextoDropdown(tipos);
         }
         if(data && data.tabla_comunas){
           const tbody=document.querySelector("#tablaComunas tbody");
@@ -158,6 +183,9 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
       const fecha2=document.getElementById("fecha2").value;
 
       if (new Date(fecha1) > new Date(fecha2)) {
+        if (!fecha1 || !fecha2){
+          alert("Debe seleccionar ambas fechas")
+        }
         alert("La fecha inicial no puede ser posterior a la fecha final.");
         return;
       }
@@ -165,6 +193,23 @@ function crearCheckboxes(tipos, filtrosPrevios = null) {
       actualizarMapa();
     });
   });
+
+  // Función para actualizar el texto del botón del dropdown
+    function actualizarTextoDropdown() {
+      const dropdownBtn=document.getElementById("dropdownTipos");
+      const checkTodas = document.getElementById("checkTodas");
+      const seleccionadas = [...document.querySelectorAll(".checkTipo:checked")].map(c => c.value);
+
+      if(!dropdownBtn) return;
+  
+      if (checkTodas && checkTodas.checked || seleccionadas.length === 0) {
+        dropdownBtn.textContent = "Todas las infracciones";
+      } else if (seleccionadas.length === 1) {
+        dropdownBtn.textContent = seleccionadas[0];
+      } else {
+        dropdownBtn.textContent = "Varias Infracciones Seleccionadas";
+      }
+    }
   
   // Actualización automática cada 5 minutos (300000 ms)
   setInterval(actualizarMapa, 300000);

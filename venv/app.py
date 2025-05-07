@@ -302,7 +302,11 @@ def geo():
                 SELECT
                     ai.SLAT,
                     ai.SLNG,
-                    ti.DES
+                    ai.COD_INFRACCIONES,
+                    (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 1))) AS "Descripcion Infraccion 1",
+            (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 2))) AS "Descripcion Infraccion 2",
+            (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 3))) AS "Descripcion Infraccion 3",
+            (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 4))) AS "Descripcion Infraccion 4"
                 FROM
                     AGENTES.ACTA_INFRACCION ai
                 INNER JOIN AGENTES.ACTA_INFRACCION_INFRACCION aii ON
@@ -319,116 +323,119 @@ def geo():
                 and ai.SLNG <>'0'
                 '''
             
-            if tipos_filtro:
-                tipos_named={f'tipo{i}':tipo for i, tipo in enumerate(tipos_filtro)}
-                sql+=f" AND ti.DES IN ({','.join(f':{k}' for k in tipos_named)})"
-                params={'fecha1':fecha1,'fecha2':fecha2,**tipos_named}
-            
-            else:
-                params={'fecha1':fecha1,'fecha2':fecha2}
-
+            params={
+                'fecha1':fecha1,
+                'fecha2':fecha2
+            }
             cursor.execute(sql,params)
-        
-
-            geo=cursor.fetchall()
+            rows=cursor.fetchall()
 
         except Exception as e:
-            return jsonify({'Error al obtener los datos': str(e)}),500
-
-        df_geo=pd.DataFrame(geo,columns=['lat','lon','tipo_infraccion'])
-        tipos_infraccion=sorted(df_geo['tipo_infraccion'].unique().tolist())
+            return jsonify({'Error al obtener los datos: ',str(e)}),500    
 
 
+        #Dataframe de la base de datos con la lat y long
+        df_geo=pd.DataFrame(rows,columns=['lat','lon','cod_infracciones','desc1','desc2','desc3','desc4'])
 
-
-        #Cargo el GeoJson
-        geojson="https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
-        datos_geo=requests.get(geojson).json()
-
-        #GeoDataFrame con datos de las infracciones
-        gdf_infracciones=gpd.GeoDataFrame(
-            df_geo,
-            geometry=gpd.points_from_xy(df_geo['lon'],df_geo['lat']),crs="EPSG:4326"
+        df_long=(
+            df_geo.melt(
+                id_vars=['lat','lon'],
+                value_vars=['desc1','desc2','desc3','desc4'],
+                var_name='desc_num',
+                value_name='tipo_infraccion'
+            ).dropna(subset=['tipo_infraccion'])
         )
 
-        #GeoDataFrame con los datos de las comunas
-        gdf_comunas=gpd.read_file(geojson)
-        gdf_comunas=gdf_comunas.to_crs(gdf_infracciones.crs)
+        #Filtro por Tipos
+        if tipos_filtro:
+            df_long=df_long[df_long['tipo_infraccion'].isin(tipos_filtro)]
 
-        #Union de infraccion por comunas
+
+        tipos_infraccion=sorted(df_long['tipo_infraccion'].unique().tolist())
+
+
+        #Cargo el GeoJson de las comunas
+        geojson_comunas='https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson'
+
+        datos_geo=requests.get(geojson_comunas).json()
+
+        #Uno los datos de la BB.DD con el geojson
+        gdf_pts=gpd.GeoDataFrame(
+            df_long,
+            geometry=gpd.points_from_xy(df_long['lon'],df_long['lat']),
+            crs="EPSG:4326"
+        )
+
+        gdf_comunas=gpd.read_file(geojson_comunas).to_crs(gdf_pts.crs)
         infracciones_comunas=gpd.sjoin(
-            gdf_infracciones,
+            gdf_pts,
             gdf_comunas[['comuna','geometry']],
             how='inner',
             predicate='within'
         )
 
-        #Calculo infracciones por comunas
-        cant_infracciones_comunas=infracciones_comunas['comuna'].value_counts().to_dict()
-
-        #Inserto la cantidad de infracciones por comuna en los datos del GeoJson de las comunas
-
-        for feature in datos_geo['features']:
-            comuna_nombre=feature['properties']['comuna']
-            cantidad=cant_infracciones_comunas.get(comuna_nombre,0)
-            feature['properties']['cantidad_infracciones']=cantidad
+        #Cuento por comuna
+        cnts=infracciones_comunas['comuna'].value_counts().to_dict()
+        for feat in datos_geo['features']:
+            nom=feat['properties']['comuna']
+            feat['properties']['cantidad_infracciones']=cnts.get(nom,0)
 
 
-
-
-
-
-
-        #Creo el mapa
-
+        #Genero el mapa
         mapa=px.scatter_mapbox(
-            df_geo,
+            df_long,
             lat='lat',
             lon='lon',
             color='tipo_infraccion',
-            zoom=1,
+            zoom=11,
             height=900,
-            title="Infracciones por Comunas"
+            title='Infracciones por Comunas'
         )
 
-        #Agrego la capa por comunas
         mapa.update_layout(
             mapbox=dict(
                 style="open-street-map",
-                layers=[
-                    dict(
-                        sourcetype="geojson",
-                        source=datos_geo,
-                        type="line",
-                        color="black",
-                        line=dict(width=2)
-                    )
-                ],
-                center={"lat":-34.60,"lon":-58.38},
+                layers=[{
+                    'sourcetype':"geojson",
+                    'source':datos_geo,
+                    'type':"line",
+                    'color':"black",
+                    'line':{'width':2}
+                }],
+                center={'lat':-34.60,'lon':-58.38},
                 zoom=11
             ),
-            margin={"r":0,"t":40,"l":0,"b":0},
-            title=dict(x=0.5),
+            margin={'r':0,'t':40,'l':0,'b':0},
+            title={'x':0.5},
             showlegend=False
         )
 
         map_json=mapa.to_json()
 
-        tabla_comunas=[{'comuna':k,'cantidad':v} for k,v in cant_infracciones_comunas.items()]
 
-        tabla_comunas.sort(key=lambda x: int(x['comuna']) if str(x['comuna']).isdigit() else str(x['comuna']))
+        #Tabla infracciones por comunas
+        tabla_comunas=[
+            {'comuna':k,'cantidad':v}
+            for k, v in cnts.items()
+        ]
 
+        tabla_comunas.sort(
+            key=lambda x:int(x['comuna'])
+            if str(x['comuna']).isdigit()
+            else x['comuna']
+        )
 
+        #Devuelvo el JSON o renderizo la plantilla
+        payload={
+            'mapa':map_json,
+            'tipos':tipos_infraccion,
+            'tabla_comunas':tabla_comunas
+        }
 
         if request.method=='POST':
-            return jsonify({'mapa':map_json,
-                            'tipos':tipos_infraccion,
-                            'tabla_comunas':tabla_comunas})
-            
-        else:
-            return render_template('Geolocalizacion.html',mapa=map_json,tipos=tipos_infraccion,tabla_comunas=tabla_comunas)
+            return jsonify(payload)
         
-
+        return render_template('Geolocalizacion.html',**payload)
 
 
 @app.route("/login")
@@ -482,10 +489,6 @@ def getAToken():
     session['refresh_token']=tokens.get("refresh_token")
 
 
-    # access_token=tokens["access_token"]
-    # session["refresh_token"]=tokens.get("refresh_token")
-
-
     #datos del usuario
     user_info=requests.get(
         "https://graph.microsoft.com/v1.0/me",
@@ -494,14 +497,6 @@ def getAToken():
 
     session["user"]=user_info
     return redirect(url_for("index"))
-
-
-# @app.route("/home")
-# def home():
-#     if 'user' not in session:
-#         return redirect("/")
-    
-#     return render_template("home.html",user=session["user"])
 
 
 @app.route("/logout")
@@ -532,19 +527,7 @@ def refresh():
         "grant_type":"refresh_token",
         "client_secret":CLIENT_SECRET
     }
-        
-    # refresh_token=session.get("refresh_token")
 
-    # if not refresh_token:
-    #     return redirect("/login")
-    
-    # data={
-    #     "client_id":CLIENT_ID,
-    #     "scope":SCOPE,
-    #     "refresh_token":refresh_token,
-    #     "grant_type":"refresh_token",
-    #     "client_secret":CLIENT_SECRET
-    # }
 
     resp=requests.post(TOKEN_URL,data=data)
 
@@ -558,8 +541,6 @@ def refresh():
     session['last_refresh']=datetime.now()
     session['_fresh']=datetime.now() + timedelta(minutes=30)
 
-
-    #return jsonify(tokens)
     return jsonify({"status":"token refreshed"})
 
 
