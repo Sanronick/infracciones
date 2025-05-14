@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 import ssl
 from datetime import timedelta, datetime, timezone
+from geocode_usig import usgi_geocode
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -303,6 +305,15 @@ def geo():
                     ai.SLAT,
                     ai.SLNG,
                     ai.COD_INFRACCIONES,
+                    ai.CALL || 
+        CASE 
+            WHEN (ai.ALTU IS NULL OR ai.ALTU = '0') THEN 
+                CASE 
+                    WHEN ai.CPDE IS NOT NULL THEN ' y ' || ai.CPDE  
+                    ELSE ' y ' || ai.CPIZ                          
+                END 
+            ELSE ' ' || ai.ALTU                                     
+        END AS "Direccion"
                     (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 1))) AS "Descripcion Infraccion 1",
             (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 2))) AS "Descripcion Infraccion 2",
             (SELECT ti.DES FROM AGENTES.TIPO_INFRACCIONES ti WHERE ti.ID = TRIM(REGEXP_SUBSTR(ai.COD_INFRACCIONES, '[^,]+', 1, 3))) AS "Descripcion Infraccion 3",
@@ -317,10 +328,6 @@ def geo():
                 and ai.dependencia_fk in ( 58,
                                             59,
                                             61 )
-                and ai.slat is not null
-                and ai.slng is not null
-                and ai.SLAT <>'0'
-                and ai.SLNG <>'0'
                 '''
             
             params={

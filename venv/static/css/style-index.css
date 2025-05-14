@@ -1,0 +1,174 @@
+body{
+    font-family: 'Archivo',sans-serif;
+    font-weight: 400;
+}
+
+.bold{
+    font-weight: 700;
+    font-size: 48px;
+}
+header{
+    position: relative;
+    width: 100%;
+    height: 12vh;
+    display: flex;
+    align-items: center;
+    font-family: sans-serif;
+    min-height: 100px;
+    max-height: 160px;
+}
+
+.encabezado{
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 78px;
+    height: 100%;
+    background-color: #ffcc00;
+    border-radius: 0px 40px 0px 0px;
+    display: flex;
+    align-items: center;
+    z-index: 3;
+    padding: 0 1rem;
+    box-sizing: border-box;
+}
+
+.dibujo1{
+    background-color: #153244;
+    right: 1px;
+    z-index: 0;
+}
+
+.escudo{
+    width: auto;
+    height:80%;
+    max-height: 120px;
+    margin-left: 1rem;
+    flex-shrink: 0;
+}
+
+.titulo{
+    flex: 1;
+    text-align: center;
+    color: #153244;
+    font-size: 2.5vw;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-right: 2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dibujo{
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 74px;
+    border-radius: 0 40px 0 0;
+}
+
+.dibujo2{
+    background-color: #8ee2d5;
+    right: 30px;
+    z-index: 1;
+}
+
+.dibujo3{
+    background-color: #ffcc00;
+    right: 58px;
+    z-index: 2;
+}
+
+.nav-bar{
+    border: 1px solid #023858;
+    border-radius: 3px 3px 3px 3px;
+    width: 1589px;
+    height: 77px;
+    background: #f3f6f9;
+}
+
+.nav-links{
+    display: flex;
+    margin: 0px;
+    padding: 0px;
+    list-style: none;
+    justify-content: space-around;
+}
+
+.nav-links li{
+    flex: 1;
+    text-align: center;
+    border-right: 1px solid #023858;
+}
+
+.nav-links li:last-child{
+    border-right: none;
+}
+
+.nav-links a{
+    display: block;
+    padding: 15px;
+    color: #023858;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nav-links a:hover{
+    background-color: #8ee2d5;
+    color: #FFFFFF;
+}
+
+@media(max-width:600px){
+    .titulo{
+        font-size: 3.9vw;
+        margin-right: 1rem;
+        white-space: normal;
+    }
+
+    .escudo{
+        height: 70%;
+        margin-left: 0.5rem;
+    }
+
+    .encabezado{
+        right: 120px;
+    }
+
+    .dibujo{
+        width: 90px;
+    }
+    .dibujo2{
+        right: 30px;
+    }
+
+    .dibujo3{
+        right: 62px;
+    }
+}
+
+@media(min-width:1600px){
+    .titulo{
+        font-size: 2vw;
+    }
+
+    .escudo{
+        max-height: 140px;
+    }
+    .dibujo{
+        width: 190px;
+    }
+    .dibujo2{
+        right: 40px;
+    }
+    .dibujo3{
+        right: 80px;
+    }
+    .dibujo1{
+        right: 1px;
+    }
+
+    .encabezado{
+        right: 180px;
+    }
+}

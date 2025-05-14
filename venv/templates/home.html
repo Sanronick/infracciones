@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 2rem; }
+        header { margin-bottom: 2rem; }
+        nav a { margin-right: 1rem; text-decoration: none; color: #0078D4; }
+        .btn { display: inline-block; padding: 0.5rem 1rem; border: 1px solid #0078D4; border-radius: 4px; text-decoration: none; color: #0078D4; }
+        .btn:hover { background-color: #f0f8ff; }
+    </style>
+</head>
+<body>
+    <header>
+        {% if user %}
+            <p>¡Bienvenido, {{ user.displayName }}!</p>
+            <nav>
+                <a href="{{ url_for('logout') }}" class="btn">Cerrar sesión</a>
+                <a href="{{ url_for('ver_planilla') }}" class="btn">Leer Excel</a>
+            </nav>
+        {% else %}
+            <p>No has iniciado sesión.</p>
+            <a href="{{ url_for('login') }}" class="btn">Iniciar sesión con Microsoft</a>
+        {% endif %}
+    </header>
+    <main>
+        {% if user %}
+            <p>Selecciona "Leer Excel" para descargar y visualizar el archivo de SharePoint.</p>
+        {% else %}
+            <p>Por favor, inicia sesión para continuar.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

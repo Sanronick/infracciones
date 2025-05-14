@@ -1,33 +1,52 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{url_for('static',filename='css/style-index.css')}}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/venv/static/css/style-index.css">
+    <!-- <link rel="stylesheet" href="{{url_for('static',filename='css/style-index.css')}}"/> -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <title>Dashboard de Infracciones</title>
-</head>
-<body>
+  </head>
+  <body>
     <header>
-        <h1>Bienvenido al Dashboard de Infracciones</h1>
-
-        {% if user %}
-
-        <a href="{{ url_for('logout') }}" class="btn">Cerrar Sesion</a>
-        <nav>
-            <ul>
-                <li><a href="{{ url_for('index')}}" type="button">Inicio</a></li>
-                <li><a href="{{ url_for('infracciones')}}" type="button">Dashboard 1</a></li>
-                <li><a href="{{ url_for('geo')}}" type="button">MAPA</a></li>
-            </ul>
-        </nav>
-
-        {% else %}
-
-        <a href="{{url_for('login')}}" class="btn">Login</a>
-        {% endif %}
+        <div class="encabezado">
+          <img src="/venv/static/images/escudo.png" alt="escudo" class="escudo">
+          <!-- <img src="{{url_for('static',filename='images/escudo.png')}}" alt="escudo" class="escudo"> -->
+            <h1 class="bold titulo">Cuerpo de Agentes de Tránsito</h1>
+        </div>
+        <div class="dibujo dibujo1"></div>
+        <div class="dibujo dibujo2"></div>
+        <div class="dibujo dibujo3"></div>
     </header>
+
+      {% if user %}
+
+      <p>¡Hola {{user.displayName}}!</p>
+
+      <nav class="nav-bar">
+        <div class="hamburguer" onclick="toggleMenu()">☰</div>
+        <ul class="nav-links">
+          <li><a href="{{ url_for('index')}}" type="button">Inicio</a></li>
+          <li>
+            <a href="{{ url_for('infracciones')}}" type="button">Gráficos</a>
+          </li>
+          <li><a href="{{ url_for('geo')}}" type="button">MAPA</a></li>
+        </ul>
+      </nav>
+      
+      {% else %}
+      <p>Inicia Sesion para ver las opciones</p>
+      <a href="{{url_for('login')}}" class="btn">Login</a>
+      <a href="{{ url_for('logout') }}" class="btn">Cerrar Sesion</a>
+      {% endif %}
     <main>
-        <h2>Cuerpo de Agentes de Transito del GCABA</h2>
+      <h2>Cuerpo de Agentes de Transito del GCABA</h2>
     </main>
-</body>
+    <footer>
+        <div class="pie"></div>
+    </footer>
+  </body>
 </html>
